@@ -13,14 +13,19 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 [bboxes]: ./examples/bounding_boxes.png "Bounding Boxes"
-[project_video_gif]: ./examples/project_output.gif "Project Video GIF"
-[project_video]: ./project_video:output.mp4 "Project Video"
+[image2]: ./examples/HOG_example.jpg
+[image3]: ./examples/sliding_windows.jpg
+[image4]: ./examples/sliding_window.jpg
+[image5]: ./examples/bboxes_and_heat.png
+[image6]: ./examples/labels_map.png
+[image7]: ./examples/output_bboxes.png
+[video1]: ./project_video.mp4
 
 ---
 **Requirements**
 
 * [Anaconda 3](https://www.anaconda.com/download/) is installed on your machine.
-* Load dataset for [vehicles](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicles](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip)
+* Load data set for [vehicles](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicles](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip)
 ---
 ## **Getting started**
 
@@ -47,7 +52,7 @@ pip install -r requirements.txt
 python main.py project_video.mp4 project_video_output.mp4
 ```
 
-Optionally you can also add start and/or end times
+Optionally you can also add a start and/or end times
 ```sh
 python main.py project_video.mp4 project_video_output.mp4 --t_start '00:00:05' --t_end '00:00:23.234'
 ```
@@ -91,10 +96,12 @@ The `BinSpatial(Feature)` class uses spatial binning of color to generate a feat
 
 
 Final choice of parameters:
+
 |Parameter | Value |
 |:---------|:------|
 |Color space | LUV |
 |Spatial size | (32, 32) |
+
 
 #### Color Histogram
 
@@ -108,6 +115,7 @@ Color histogram was not used.
 The `HOG(Feature)` class creates a histogram of oriented gradients of the input image. One can choose between various color spaces (*cspace*) and whether to use one specific or all channels (*hog_channel*). Also the number of orientations (*orient*), the pixels per cell (*pix_per_cell*) and the cells per block (*cell_per_block*) can be tuned. The class also has the `.extract_feature()` method, that returns the HOG feature vector.
 
 Final choice of parameters
+
 | Parameter  | Value |
 |:-----------|:------|
 | Color space | YCrCb |
@@ -116,79 +124,62 @@ Final choice of parameters
 | cell_per_block | 2 |
 | hog_channel | 'ALL' |
 
+
 ### Training the Classifier
-
-The linear SVC was trained using the `classifier/train.py` script.
-
-The input data, i.e. the extracted features from the image first were scaled using a  StandardScaler from the sklearn.preprocessing library.
-
-```python
-from sklearn.preprocessing import StandardScaler
-
-# Initialize and fit StandardScaler
-X_scaler = StandardScaler().fit(X_train)
-
-# Apply the scaler to X_train and X_test
-X_train = X_scaler.transform(X_train)
-X_test = X_scaler.transform(X_test)
-```
-
-Then the transformed training data was used to train the SVC:
-
-```python
-from sklearn.svm import LinearSVC
-
-# Use a linear SVC
-svc = LinearSVC(C=0.5)
-
-# Fit classifier
-svc.fit(X_train, y_train)
-```
-
-Here the parameter C was set to 0.5.
-An accuracy score of **0.984** was achieved.
-
+I trained a linear SVM using...
 
 #### Adding more Traning Data
 
-When first training the classifier it seemed to have a lot of false positives on the left kerbside of the lane. This might be caused by a lack of images in the non-vehicle data that contains physical dividers. To improve on this situation, more training data was generated using the `GenerateData.ipynb`. 
-
-Since there is project video car on the left lane of the project video, it is possible to extract images of different sizes from the lower left area of the project video and use those images as non-vehicle training data. It is important to use different sizes, since the classifier will use different sizes (resized to a standard size) as well.
-
 ### Sliding Window Search
 
-In the file `utils.py` the following function is contained:
- 
+In the file `utils.py` the following function is defined:
+
 ```python
-def get_windows(img, x_start_stop=[None, None], y_start_stop=[None, None], overlap=(0.5, 0.5),
-                window_start_size=(128, 128), window_end_size=(64, 64), layers=1,
-                perspective_margin=(75, 75)):
+def get_windows(img, x_start_stop=[200, 1280], y_start_stop=[400, 625], overlap=(0.5, 0.5),
+                window_start_size=(128, 128), window_end_size=(64, 64), layers=3,
+                perspective_margin=(75, 75))
 ```
 
-It returns all boxes i.e. the segment of the input image extracted, that are later classified. The boxes have different sizes. The image shows, that the blue boxes are the largest and they also cover the larges area. Although the boxes look quite small, they are acutally not. In the image below are only two rows of blue boxes, not three. The two rows overlap by 50 % in x and in y direction. Therefore the boxes appear to be smaller than they are. The same applies to the red and green colored boxes.
+It returns all sections of the frame/image that are later classified. The picture below shows the grid of windows that are returned. Note: The boxes appear to be smaller than they actually are, because they are overlapping 50% both in x and y direction. The biggest (blue) boxes cover the biggest area of the region of interest, whereas the smalles (red) boxes only cover the horizon of the streets.
 
 ![Bounding boxes][bboxes]
 
-### Heatmap
+#### Examples
 
-In the file `heatmap.py` the class `Heatmap` is defined. For every detected car, a predefined heat is added to an image. Those heatmaps are also stored for multiple previous frames. This way many false positives can be filtered out since single detections are not enough to create a label.
+Ultimately I searched on thre scales using YCrCb 3-channel HOG features and spatially binned color (LUV) in the feature vector, which provided a nice result.  Here is an example image:
+
+![alt text][image4]
+---
+
+### Video Implementation
+
+#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
+Here's a [link to my video result](./project_video.mp4)
+
+
+#### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
+
+I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
+
+Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
+
+### Here are six frames and their corresponding heatmaps:
+
+![alt text][image5]
+
+### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
+![alt text][image6]
+
+### Here the resulting bounding boxes are drawn onto the last frame in the series:
+![alt text][image7]
+
+
 
 ---
 
-## Video Implementation
+### Discussion
 
-Here's a [link to the video result](./project_video_output.mp4)
+#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-
-Here is an example of the debug view. On the left is the output video (labels after cleaning), on the right there are two heatmaps. The top heatmap is the average heatmap over the last stored frame. The lower heatmap is the heatmap of the current frame. The bottom image show all bounding boxes that are classified as cars. 
-![Video Output][project_video_gif]
-
----
-
-## Possible Improvements
-
-* The video still has some false positives. Also the cars are not detected immediately. Tuning the classifier parameters might lead to a more rubust classification
-* The bounding boxes are quite unstable. A smoothing algorithm would be useful.
-* The framerate is really low. One could think of an optimized algorithm, that only processes every n^th image completely and all the other image only partially
-* After all, this "traditional" approach can not keep up (in terms of accuracy and speed) with the YOLO object detection
+Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
 
